@@ -1,110 +1,81 @@
-# Durable Campaign Dispatcher (Agentic Universe Take-Home: Assignment B)
+# Agentic Universe: Junior SDE Take-Home (Data & Workflow)
 
-[![Tests](https://img.shields.io/badge/pytest-18%20passed-brightgreen)](#how-to-run)
-[![Violations](https://img.shields.io/badge/violations-0%20(100%25%20compliance)-brightgreen)](#results--verification)
-[![Crash%20Recovery](https://img.shields.io/badge/kill%20--9%20recovery-verified-blue)](#results--verification)
-[![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
+Thanks for your interest in Agentic Universe. We build AI voice agents for insurers, lenders and
+consumer brands across India and APAC. Our platform has three layers:
 
-An autonomous, crash-resilient outbound campaign dispatcher orchestrating voice calls across India/APAC under strict regulatory windows (09:00–21:00 IST), multi-tenant concurrency limits, retry backoffs, scheduled callbacks, and global DND constraints.
+- **Data:** leads, call events, dispositions and the interaction ledger that every client report
+  is built on.
+- **Workflow:** campaigns, scheduling, dialling, retries and callbacks, all orchestrated durably.
+- **Application:** dashboards, consoles and APIs.
 
-Full engineering design, state diagrams, and mathematical proofs are detailed in **[`SUBMISSION.md`](SUBMISSION.md)** and **[`AI_USAGE.md`](AI_USAGE.md)**.
+This take-home focuses on **data** and **workflow**. **Pick one assignment.** Don't do both.
 
----
-
-## Quick Start (Run from Project Root)
-
-### 1. Setup Environment
-```bash
-python -m venv .venv
-# On Windows:
-.venv\Scripts\activate
-# On Linux/macOS:
-source .venv/bin/activate
-
-pip install -r requirements.txt
-```
-
-### 2. Run Fast Unit Tests (4.3s)
-Validates calling window maths, regulatory hours, priority queue logic (Callbacks > Retries > Fresh), state machine transitions, DND propagation, and HMAC signature verification:
-```bash
-python -m pytest solution/tests
-```
-
-### 3. Run Automated End-to-End Validation Test
-Automatically boots the mock carrier API on port `8099`, launches the dispatcher on port `8200`, runs through all 200 leads under **chaos failure scale 1.0** (503s, 504 timeouts, lost & duplicate webhooks), compares with `/admin/leads`, and verifies 0 violations:
-```bash
-python solution/validate_run.py 1200 1.0 7
-```
-
-### 4. Run the Hard Crash (`kill -9`) Recovery Test
-Simulates an abrupt `kill -9` while active calls are in flight, restarts from SQLite, audits in-flight requests against the carrier API, and verifies 100% recovery with 0 violations and 0 lost leads:
-```bash
-python solution/test_crash_kill.py
-```
-
-### 5. Run as Live Production Services (Two Terminals)
-```bash
-# Terminal 1: Run carrier mock API
-cd assignment-b-workflow
-python -m mock_telephony --speed 1200 --seed 7 --failure-scale 1.0
-
-# Terminal 2: Run durable dispatcher
-python -m solution
-```
-- **Live Carrier Admin Report:** [http://127.0.0.1:8099/admin/report](http://127.0.0.1:8099/admin/report)
-- **Live Carrier Expected Leads:** [http://127.0.0.1:8099/admin/leads](http://127.0.0.1:8099/admin/leads)
-- **Live Dispatcher Progress:** [http://127.0.0.1:8200/status](http://127.0.0.1:8200/status)
-
----
-
-## Results & Verification
-
-| Metric | Target | Achieved Result |
+| | Assignment | You'll mostly be doing |
 |---|---|---|
-| **Compliance Violations** | `0` | **`0`** |
-| **Final State Agreement** | 100% match with `/admin/leads` | **200 / 200 leads (0 mismatches)** |
-| **Max Concurrency Seen** | `acme: 4, zen: 3` | **`acme: 4, zen: 3` (Strictly respected)** |
-| **Duplicate Webhooks Handled** | Harmless | **39 duplicate deliveries safely ignored** |
-| **Lost Webhooks Recovered** | No stalled leads | **15 lost carrier webhooks recovered via active audit** |
-| **Ambiguous 504 Timeouts** | At-most-once dialling | **100% resolved via `GET /v1/calls?request_id=...`** |
-| **Median Callback Lateness (`p50`)** | Minimised | **4.2 simulated minutes** |
+| **A** | [Interaction Ledger & Reporting Pipeline](assignment-a-data/README.md) | Messy-data ingestion, schema design, idempotent pipelines, exact metrics |
+| **B** | [Durable Campaign Dispatcher](assignment-b-workflow/README.md) | State machines, idempotency, failure handling, scheduling under constraints |
 
-Final results file generated at **[`solution/final_state.csv`](solution/final_state.csv)**.
+Both are judged on the same bar. Pick the one that excites you more.
 
----
+## Ground rules
 
-## Directory Structure
+- **Time box:** plan for about **6–8 focused hours**. You have **72 hours** from when you receive
+  this. We know you have a life. If you run out of time, stop and tell us in `SUBMISSION.md`
+  what you'd do next. A well-explained partial solution beats a rushed complete one.
+- **Language:** Python 3.11+. Use any libraries you like; list them in `requirements.txt`.
+- **AI tools** (Claude, Cursor, Copilot, ChatGPT...) are **allowed**, as they would be on the
+  job. You must fill in [`AI_USAGE.md`](AI_USAGE.md) honestly. In the follow-up interview we'll
+  ask you to walk through your code and change it live. Submit only code you understand and can
+  defend.
+- **Ambiguity is intentional in places.** When the spec doesn't decide something, make a
+  reasonable call and write it down in `SUBMISSION.md`. Don't wait for an answer from us.
+- **Synthetic data only.** Everything here is generated. No real customer data is involved.
 
-```
-.
-├── solution/                       # Complete, self-contained solution codebase
-│   ├── clock.py                    # SimClock & FakeClock time scaling engines
-│   ├── window.py                   # Regulatory (09:00-21:00) & campaign window validation
-│   ├── models.py                   # Data models and lifecycle state definitions
-│   ├── db.py                       # SQLite WAL-mode transactional state machine
-│   ├── telephony.py                # Carrier HTTP client (handles 503s & resolves 504s)
-│   ├── webhook_server.py           # FastAPI webhook receiver (HMAC & idempotency)
-│   ├── dispatcher.py               # Priority scheduler & active lost-webhook reconciler
-│   ├── runner.py                   # Single-process orchestrator
-│   ├── validate_run.py             # End-to-end chaos test runner
-│   ├── test_crash_kill.py          # Automated kill -9 crash recovery test
-│   ├── final_state.csv             # Final output matching /admin/leads
-│   └── tests/                      # 18 unit tests
-├── assignment-b-workflow/          # Assignment fixtures & mock telephony provider
-│   ├── fixtures/                   # campaigns.json & leads CSV files
-│   └── mock_telephony/             # Carrier API server
-├── SUBMISSION.md                   # Detailed design walkthrough and failure analysis
-├── AI_USAGE.md                     # AI usage disclosure
-└── requirements.txt                # Project dependencies
+## Getting started
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+# then follow your chosen assignment's README
 ```
 
----
+`docker-compose.yml` starts a local Postgres if you want one (`docker compose up -d`). SQLite
+is equally acceptable.
 
-## Original Assignment Context
+## What to submit
 
-Agentic Universe builds AI voice agents for insurers, lenders, and consumer brands across India and APAC. Our platform has three layers:
-- **Data:** leads, call events, dispositions, and the interaction ledger that every client report is built on.
-- **Workflow:** campaigns, scheduling, dialling, retries, and callbacks, all orchestrated durably.
-- **Application:** dashboards, consoles, and APIs.
+1. Push your work to a **private** GitHub or GitLab repository. Start from this repo and keep
+   its structure. Put your code in `solution/` (or a similar top-level folder) and keep the
+   original files unmodified.
+2. Your repo must include:
+   - `SUBMISSION.md`: fill in the template provided
+   - `AI_USAGE.md`: fill in the template provided
+   - Exact setup and run commands that work from a clean clone
+   - Tests, runnable with one command (for example `pytest`)
+3. Give read access to **`[[REVIEWER_HANDLES]]`** and email the repo link to
+   **`[[SUBMISSION_EMAIL]]`** before the deadline.
 
-This repository implements **Assignment B: Durable Campaign Dispatcher**.
+Please **don't** publish your solution publicly, and **don't** commit generated data, `.env`
+files, or databases.
+
+## What happens next
+
+If your submission clears the bar, we'll schedule a **45-minute technical conversation**:
+
+- 15 min: you walk us through your design and the decisions in `SUBMISSION.md`
+- 20 min: we change a requirement and you extend your code live (AI tools allowed; screen
+  share)
+- 10 min: your questions for us
+
+## What we look for
+
+| Signal | What good looks like |
+|---|---|
+| Correctness | It produces the right answer on data and seeds you haven't seen |
+| Robustness | It behaves sensibly when inputs are dirty, things fail, or it's run twice |
+| Design | Clear data and state model; you can explain why it's safe |
+| Code quality | Readable, organised, tested where it matters |
+| Communication | Honest about trade-offs, assumptions and what's missing |
+| Ownership | You made decisions instead of waiting to be told |
+
+Good luck. We're looking forward to reading your work.
