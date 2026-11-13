@@ -23,3 +23,4 @@ htmlcov/
 *.db-wal
 *.db-shm
 .env
+
